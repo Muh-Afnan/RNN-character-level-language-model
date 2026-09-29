@@ -37,26 +37,20 @@ class CharTokenizer():
             seqs.append(seq)
         return seqs
 
-import torch
-from torch import nn
-
-
 class RNNFromScratch(nn.Module):
-    def __init__(self,vocab_size: int,embedding_dim: int,hidden_size: int,):
+    def __init__(self,vocab_size:int, embedding_dim:int, hidden_size:int,):
         super().__init__()
-        if min(vocab_size, embedding_dim, hidden_size) <= 0:
+        if min(vocab_size, embedding_dim,hidden_size)<=0:
             raise ValueError("All sizes must be positive.")
-
         self.vocab_size = vocab_size
         self.embedding_dim = embedding_dim
         self.hidden_size = hidden_size
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        self.W_xh = nn.Parameter(torch.empty(embedding_dim, hidden_size))
-        self.W_hh = nn.Parameter(torch.empty(hidden_size, hidden_size))
+        self.embedding = nn.Embedding(vocab_size,embedding_dim)
+        self.W_xh = nn.Parameter(torch.empty(embedding_dim,hidden_size))
+        self.W_hh = nn.Parameter(torch.empty(hidden_size,hidden_size))
         self.b_h = nn.Parameter(torch.zeros(hidden_size))
-        self.W_hy = nn.Parameter(torch.empty(hidden_size, vocab_size))
+        self.W_hy = nn.Parameter(torch.empty(hidden_size,vocab_size))
         self.b_y = nn.Parameter(torch.zeros(vocab_size))
-
         nn.init.xavier_uniform_(self.W_xh)
         nn.init.orthogonal_(self.W_hh)
         nn.init.xavier_uniform_(self.W_hy)
@@ -94,33 +88,58 @@ class RNNFromScratch(nn.Module):
                 )
 
             h = h0
-
         hidden_states = []
-
         for t in range(seq_len):
-            # Current character's embedding.
             x_t = embedded[:, t, :]
-            # Shape: (batch_size, embedding_dim)
-
-            # Manual RNN recurrence.
             h = torch.tanh(
                 x_t @ self.W_xh
                 + h @ self.W_hh
                 + self.b_h
             )
-            # Shape: (batch_size, hidden_size)
-
             hidden_states.append(h)
-
-        # Collect the hidden state from every time step.
         hidden_states = torch.stack(hidden_states, dim=1)
-        # Shape: (batch_size, seq_len, hidden_size)
-
-        # Predict the next character at EVERY time step.
         logits = hidden_states @ self.W_hy + self.b_y
-        # Shape: (batch_size, seq_len, vocab_size)
-
         return logits, h
+
+    def fit(self,dataloader,epochs,loss_fn,optimizer):
+        epoch_losses=[]
+        for epoch in range(epochs):
+            self.train()
+            total_loss = 0
+            for x_batch, y_batch in dataloader:
+                optimizer.zero_grad()
+                prediction,h = self(x_batch)
+                pred = prediction.reshape(-1, self.vocab_size)
+                y_batch = y_batch.reshape(-1, )
+                loss = loss_fn(pred,y_batch)
+                loss.backward()
+                optimizer.step()
+                total_loss +=loss.item()
+            avg_loss = total_loss / len(dataloader)
+            epoch_losses.append(avg_loss)
+
+            if (epoch +1)%10 ==0:
+                print(
+                    f"Epoch {epoch + 1}/{epochs}, "
+                    f"Loss: {total_loss:.4f}"
+                )
+            # if scheduler is not None:
+            #     if isinstance(
+            #         scheduler,
+            #         torch.optim.lr_scheduler.ReduceLROnPlateau
+            #     ):
+            #         scheduler.step(avg_loss)
+            #     else:
+            #         scheduler.step()
+        return epoch_losses
+
+    def predict(self, X):
+        self.eval()
+        with torch.no_grad():
+            logits = self(X)
+            predictions = torch.argmax(logits,dim=1)
+        return predictions
+
 
 class CustomDataset(Dataset):
     def __init__(self,x,y,tranform=None):
@@ -148,6 +167,3 @@ class DataGenerator():
             x.append(input)
             y.append(output)
         return x, y
-
-    
-            
