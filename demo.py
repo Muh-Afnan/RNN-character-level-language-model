@@ -54,7 +54,7 @@ test_loader = DataLoader(
 )
 
 loss_fn = nn.CrossEntropyLoss()
-epochs = 1
+epochs = 1000
 model = RNNFromScratch(vocab_size=vocab_size,embedding_dim=8,hidden_size=128)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 model.fit(train_loader,epochs,loss_fn,optimizer)
