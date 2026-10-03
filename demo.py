@@ -1,14 +1,20 @@
 from src.rnn import *
 from torch import nn
 from torch.utils.data import DataLoader
+import urllib.request
 
-with open(
-    "para.txt",
-    "r",
-    encoding="utf-8"
-) as file:
 
-    text = file.read()
+# with open(
+#     "para.txt",
+#     "r",
+#     encoding="utf-8"
+# ) as file:
+
+#     text = file.read()
+
+url = "https://www.gutenberg.org/files/11/11-0.txt"  # Alice in Wonderland
+text = urllib.request.urlopen(url).read().decode('utf-8')
+text = text[1000:50000]  # skip the header, take ~49k characters
 
 tokenizer = CharTokenizer()
 dataset = tokenizer.seq_generator(text=text,window=6)
@@ -48,7 +54,26 @@ test_loader = DataLoader(
 )
 
 loss_fn = nn.CrossEntropyLoss()
-epochs = 500
+epochs = 1
 model = RNNFromScratch(vocab_size=vocab_size,embedding_dim=8,hidden_size=128)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 model.fit(train_loader,epochs,loss_fn,optimizer)
+
+
+def generate(seed, length, model:RNNFromScratch,tokenizer:CharTokenizer):
+    start = tokenizer.preprocess(seed)
+    start_idx = tokenizer.char2idx_map[start]
+    string = start
+    h = None
+    for i in range(length):
+        start_tensor = torch.tensor([[start_idx]])
+        next_idx,h = model.predict(start_tensor,h)
+        char = tokenizer.idx2char_map[next_idx.item()]
+        string = string+char
+        print(f"Input: {start}, Output: {char}")
+        print(f"Full String:{string}")
+        start_idx = next_idx
+        start = tokenizer.idx2char_map[next_idx.item()]
+        print("I ran")
+
+generate(seed="f",length=50,model=model,tokenizer=tokenizer)

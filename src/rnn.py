@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from torch.utils.data import Dataloader,Dataset
+from torch.utils.data import DataLoader,Dataset
 
 
 class CharTokenizer():
@@ -11,7 +11,9 @@ class CharTokenizer():
 
     def preprocess(self,text:str):
         text = text.lower()
-        chars = list(text)
+        chars = text
+        if len(text)>1:
+            chars = list(text)
         return chars
 
     def char2idx(self,text:str):
@@ -36,7 +38,6 @@ class CharTokenizer():
             seq = (input_idx,output_idx)
             seqs.append(seq)
         return seqs
-
 class RNNFromScratch(nn.Module):
     def __init__(self,vocab_size:int, embedding_dim:int, hidden_size:int,):
         super().__init__()
@@ -121,6 +122,7 @@ class RNNFromScratch(nn.Module):
             if (epoch +1)%10 ==0:
                 print(
                     f"Epoch {epoch + 1}/{epochs}, "
+                    f"Avg: {avg_loss:.4f}",
                     f"Loss: {total_loss:.4f}"
                 )
             # if scheduler is not None:
@@ -133,12 +135,12 @@ class RNNFromScratch(nn.Module):
             #         scheduler.step()
         return epoch_losses
 
-    def predict(self, X):
+    def predict(self, X,h=None):
         self.eval()
         with torch.no_grad():
-            logits = self(X)
-            predictions = torch.argmax(logits,dim=1)
-        return predictions
+            logits,h = self(X,h)
+            predictions = torch.argmax(logits,dim=-1)
+        return predictions ,h
 
 
 class CustomDataset(Dataset):
